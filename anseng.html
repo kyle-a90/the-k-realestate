@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 스타일 정의 (기존 유지) --- */
+        body { background-color: #0f172a; margin: 0; padding: 0; overflow: hidden; height: 100vh; }
+        .slides-container { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+        .slides-wrapper { display: flex; width: fit-content; height: 100%; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); align-items: center; gap: 20px; }
+        .slide-page { width: 1123px; min-width: 1123px; height: 794px; background-color: #0f172a; color: #e2e8f0; position: relative; overflow: hidden; box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.7); flex-shrink: 0; transition: transform 0.6s, opacity 0.6s, filter 0.6s, z-index 0.6s; transform-origin: center center; z-index: 10; }
+        .slide-page.preview { transform: scale(0.65); opacity: 0.25; filter: brightness(0.3); z-index: 1; }
+        .slide-page.preview-left { transform: translateX(-40px) scale(0.65); }
+        .slide-page.preview-right { transform: translateX(40px) scale(0.65); }
+        
+        .slide-nav { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); z-index: 1000; display: flex; gap: 12px; align-items: center; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); padding: 12px 24px; border-radius: 50px; border: 1px solid rgba(59, 130, 246, 0.3); opacity: 0; transition: all 0.4s ease; pointer-events: none; }
+        .slide-nav.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+        .nav-btn { background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; font-family: 'Montserrat', sans-serif; font-weight: bold; }
+        .nav-btn:hover:not(:disabled) { background: rgba(59, 130, 246, 0.4); transform: scale(1.1); }
+        .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .slide-indicator { display: flex; gap: 8px; align-items: center; padding: 0 16px; }
+        .indicator-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(148, 163, 184, 0.5); transition: all 0.3s; cursor: pointer; }
+        .indicator-dot.active { width: 24px; background: #60a5fa; border-radius: 4px; }
+        .slide-counter { color: #94a3b8; font-family: 'Montserrat', sans-serif; font-size: 12px; padding: 0 12px; border-left: 1px solid rgba(59, 130, 246, 0.3); border-right: 1px solid rgba(59, 130, 246, 0.3); }
+        
+        /* PDF 메뉴 스타일 */
+        .pdf-menu-container { position: relative; }
+        .pdf-menu { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 8px; min-width: 180px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); opacity: 0; visibility: hidden; transition: all 0.3s ease; z-index: 1001; }
+        .pdf-menu.show { opacity: 1; visibility: visible; }
+        .pdf-menu-item { padding: 10px 16px; color: #e2e8f0; font-family: 'Noto Sans KR', sans-serif; font-size: 14px; cursor: pointer; border-radius: 8px; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+        .pdf-menu-item:hover { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .pdf-menu-item:not(:last-child) { border-bottom: 1px solid rgba(59, 130, 246, 0.2); margin-bottom: 4px; padding-bottom: 10px; }
+
+        .font-eng { font-family: 'Montserrat', sans-serif; }
+        .font-kor { font-family: 'Noto Sans KR', sans-serif; }
+        .text-accent { color: #60a5fa; } .text-cyan { color: #22d3ee; }
+        .text-gradient { background: linear-gradient(to right, #60a5fa, #22d3ee); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.2); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeUp 0.8s ease-out forwards; }
+        .delay-100 { animation-delay: 0.1s; } .delay-200 { animation-delay: 0.2s; }
+
+        /* 이미지 모달 스타일 */
+        #imageModal { transition: opacity 0.3s ease; }
+        #imageModal:not(.hidden) { display: flex !important; }
+        #imageModal.hidden { display: none !important; }
+        #modalImage { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        /* 모바일 반응형 스타일 (768px 이하에서만 적용) */
+        @media screen and (max-width: 768px) {
+            body {
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            .slides-container {
+                width: 100vw;
+                height: auto;
+                min-height: 100vh;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            .slides-wrapper {
+                flex-direction: column;
+                width: 100%;
+                gap: 0;
+                padding: 20px 0;
+            }
+            .slide-page {
+                width: 100vw;
+                min-width: 100vw;
+                height: auto;
+                min-height: auto;
+                box-shadow: none;
+                margin: 0;
+                padding: 20px 16px !important;
+            }
+            .slide-page.preview,
+            .slide-page.preview-left,
+            .slide-page.preview-right {
+                transform: none;
+                opacity: 1;
+                filter: none;
+            }
+            
+            /* 모바일 네비게이션 - 숨김 처리 */
+            .slide-nav {
+                display: none !important;
+            }
+
+            /* 모바일 텍스트 크기 조정 */
+            .font-eng.text-\[5rem\] {
+                font-size: 2.5rem !important;
+                line-height: 1.2 !important;
+            }
+            .font-kor.text-3xl {
+                font-size: 1.5rem !important;
+            }
+            .font-kor.text-4xl {
+                font-size: 1.75rem !important;
+            }
+            .font-kor.text-2xl {
+                font-size: 1.25rem !important;
+            }
+            .font-kor.text-xl {
+                font-size: 1.125rem !important;
+            }
+            .font-kor.text-lg {
+                font-size: 1rem !important;
+            }
+            .font-eng.text-6xl {
+                font-size: 2.5rem !important;
+            }
+            .font-eng.text-3xl {
+                font-size: 1.5rem !important;
+            }
+            .font-eng.text-2xl {
+                font-size: 1.25rem !important;
+            }
+
+            /* 모바일 그리드 레이아웃 조정 */
+            .grid-cols-2 {
+                grid-template-columns: 1fr !important;
+            }
+            .grid-cols-3 {
+                grid-template-columns: 1fr !important;
+            }
+            .grid-rows-2 {
+                grid-template-rows: repeat(4, auto) !important;
+            }
+            
+            /* col-span 제거 (모바일에서는 의미 없음) */
+            .col-span-1,
+            .col-span-2 {
+                grid-column: span 1 !important;
+            }
+
+            /* 모바일 간격 조정 */
+            .gap-10 {
+                gap: 1.5rem !important;
+            }
+            .gap-8 {
+                gap: 1rem !important;
+            }
+            .gap-6 {
+                gap: 0.75rem !important;
+            }
+            .gap-12 {
+                gap: 1rem !important;
+            }
+
+            /* 모바일 패딩 조정 */
+            .p-12 {
+                padding: 1rem !important;
+            }
+            .p-8 {
+                padding: 1rem !important;
+            }
+            .p-6 {
+                padding: 0.75rem !important;
+            }
+            .pl-20 {
+                padding-left: 1rem !important;
+            }
+            .pr-10 {
+                padding-right: 1rem !important;
+            }
+            .pl-6 {
+                padding-left: 0.75rem !important;
+            }
+            .pr-4 {
+                padding-right: 0.5rem !important;
+            }
+
+            /* 모바일 마진 조정 */
+            .mb-8 {
+                margin-bottom: 1rem !important;
+            }
+            .mb-6 {
+                margin-bottom: 0.75rem !important;
+            }
+            .mb-4 {
+                margin-bottom: 0.5rem !important;
+            }
+            .mb-12 {
+                margin-bottom: 1.5rem !important;
+            }
+            .mb-16 {
+                margin-bottom: 2rem !important;
+            }
+            .mb-10 {
+                margin-bottom: 1rem !important;
+            }
+            .mt-8 {
+                margin-top: 1rem !important;
+            }
+            .mt-6 {
+                margin-top: 0.75rem !important;
+            }
+            .mt-4 {
+                margin-top: 0.5rem !important;
+            }
+            .mt-auto {
+                margin-top: 1.5rem !important;
+            }
+
+            /* 모바일 높이 조정 - h-full 제거 */
+            .h-full {
+                height: auto !important;
+                min-height: auto !important;
+            }
+            .h-\[calc\(100\%-120px\)\] {
+                height: auto !important;
+                min-height: auto !important;
+            }
+            .h-56 {
+                height: 200px !important;
+            }
+
+            /* 모바일 특정 페이지 조정 */
+            #page_0 {
+                padding: 1.5rem 1rem !important;
+                min-height: 100vh;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            
+            /* 상단 수신인 */
+            #page_0 .absolute.top-12.right-12 {
+                position: relative !important;
+                top: auto !important;
+                right: auto !important;
+                text-align: left !important;
+                margin-bottom: 1rem !important;
+            }
+            
+            /* 메인 콘텐츠 영역 */
+            #page_0 .relative.z-10 {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                flex: 1 !important;
+                justify-content: flex-start !important;
+                padding-top: 0 !important;
+            }
+            
+            /* INVESTMENT PROPOSAL */
+            #page_0 .border-l-4 {
+                margin-bottom: 1.5rem !important;
+                padding-left: 0.75rem !important;
+            }
+            #page_0 .border-l-4 p {
+                font-size: 0.75rem !important;
+                letter-spacing: 0.2em !important;
+            }
+            
+            /* 큰 제목 */
+            #page_0 h1.font-eng.text-\[5rem\] {
+                font-size: 2rem !important;
+                line-height: 1.1 !important;
+                margin-bottom: 1rem !important;
+            }
+            
+            /* 부제목 및 설명 */
+            #page_0 .mt-8.pl-2 {
+                margin-top: 2.5rem !important;
+                padding-left: 0 !important;
+            }
+            #page_0 h2.font-kor.text-3xl {
+                font-size: 1.25rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+            #page_0 p.font-kor.text-xl {
+                font-size: 0.875rem !important;
+                margin-bottom: 5rem !important;
+                line-height: 1.6 !important;
+            }
+            
+            /* 작성자 박스 */
+            #page_0 .inline-flex {
+                border: none !important;
+                background: none !important;
+                backdrop-filter: none !important;
+                padding: 0 !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+                width: auto !important;
+            }
+            #page_0 .inline-flex .border-r {
+                border-right: none !important;
+                border-bottom: none !important;
+                padding-right: 0.5rem !important;
+                padding-bottom: 0 !important;
+                margin-bottom: 0 !important;
+                width: auto !important;
+            }
+            #page_0 .inline-flex span:last-child {
+                font-size: 1.125rem !important;
+            }
+            
+            /* 하단 날짜/코드 */
+            #page_0 .absolute.bottom-12.left-20 {
+                position: relative !important;
+                bottom: auto !important;
+                left: auto !important;
+                margin-top: 1.5rem !important;
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+            #page_0 .absolute.bottom-12.left-20 > div {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+            
+            #page_0 .h-full {
+                height: auto !important;
+                min-height: auto !important;
+            }
+
+            /* 모바일 지도 iframe */
+            #naver-map,
+            iframe {
+                height: 300px !important;
+                position: relative !important;
+            }
+            .relative.w-full.h-full iframe {
+                height: 300px !important;
+                min-height: 300px !important;
+            }
+
+            /* 모바일 차트 */
+            canvas {
+                max-height: 250px !important;
+            }
+
+            /* 모바일 KPI 카드 */
+            .glass-panel {
+                padding: 1rem !important;
+                min-height: auto !important;
+            }
+            .text-7xl {
+                font-size: 3rem !important;
+            }
+
+            /* 모바일 이미지 영역 높이 조정 */
+            .col-span-2 .bg-cover {
+                height: 250px !important;
+                min-height: 250px !important;
+            }
+            .absolute.bottom-6.left-6 {
+                bottom: 0.5rem;
+                left: 0.5rem;
+                font-size: 0.75rem !important;
+                padding: 0.5rem !important;
+            }
+
+            /* 모바일 결론 페이지 */
+            .slide-page.flex.flex-col.justify-center {
+                padding: 2rem 1rem 4rem 1rem !important;
+                min-height: 100vh;
+            }
+            .slide-page.flex.flex-col.justify-center .text-5xl {
+                font-size: 1.75rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .text-xl {
+                font-size: 1rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .px-12 {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .py-8 {
+                padding-top: 1rem !important;
+                padding-bottom: 1rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .text-3xl {
+                font-size: 1.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .max-w-4xl {
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+            .slide-page.flex.flex-col.justify-center .absolute.bottom-12 {
+                bottom: 1rem;
+                position: relative !important;
+                margin-top: 2rem;
+                text-align: center;
+            }
+
+            /* 모바일 헤더 */
+            header.flex.items-end {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 0.5rem;
+                margin-bottom: 1rem !important;
+            }
+            header .border-b {
+                margin-bottom: 1rem !important;
+            }
+
+            /* 모바일 리스트 */
+            .space-y-6 > * + * {
+                margin-top: 1rem !important;
+            }
+            .space-y-3 > * + * {
+                margin-top: 0.5rem !important;
+            }
+            
+            /* 모바일 flex-1 조정 */
+            .flex-1 {
+                flex: 1 1 auto !important;
+                min-height: auto !important;
+            }
+
+            /* 모바일 로그인 레이어 최적화 - 키패드 대응 */
+            #loginLayer {
+                justify-content: flex-start !important;
+                padding-top: 2rem !important;
+                padding-bottom: 2rem !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+            #loginLayer .max-w-md {
+                margin-top: auto !important;
+                margin-bottom: auto !important;
+            }
+
+            /* 모바일 결론 페이지 명함 부분 최적화 */
+            .slide-page.flex.flex-col.justify-center .px-20 {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .mb-16 {
+                margin-bottom: 2rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .max-w-4xl {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+            }
+            .slide-page.flex.flex-col.justify-center .bg-slate-800 {
+                padding: 1.5rem 1rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .bg-slate-800 > div {
+                flex-direction: column !important;
+                gap: 1.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .border-l-4 {
+                border-left: 2px solid !important;
+                padding-left: 0.75rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .text-2xl {
+                font-size: 1.25rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .text-sm {
+                font-size: 0.875rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .grid-cols-2 {
+                grid-template-columns: 1fr !important;
+            }
+            .slide-page.flex.flex-col.justify-center .col-span-2 {
+                grid-column: span 1 !important;
+            }
+            .slide-page.flex.flex-col.justify-center .bg-slate-800 > div > div:last-child {
+                min-width: auto !important;
+                width: 100% !important;
+                text-align: left !important;
+            }
+            .slide-page.flex.flex-col.justify-center .text-4xl {
+                font-size: 1.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .text-base {
+                font-size: 0.875rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .mb-6 {
+                margin-bottom: 1rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .mb-3 {
+                margin-bottom: 0.75rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .mb-2 {
+                margin-bottom: 0.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .gap-10 {
+                gap: 1.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .gap-2 {
+                gap: 0.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .gap-x-8 {
+                column-gap: 0.5rem !important;
+            }
+            .slide-page.flex.flex-col.justify-center .gap-y-2 {
+                row-gap: 0.5rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loginLayer" class="fixed inset-0 z-[99999] bg-[#0f172a] flex flex-col items-center justify-center p-4">
+        <div class="max-w-md w-full glass-panel p-8 rounded-2xl border border-slate-700 text-center shadow-2xl">
+            <h2 class="font-eng text-accent text-xl tracking-[0.2em] font-bold mb-6">케이플랜그룹(The-K)</h2>
+            <p class="font-kor text-slate-400 text-sm mb-8">보안 문서입니다. 비밀번호를 입력해주세요</p>
+            <input type="password" id="passwordInput" inputmode="numeric" pattern="[0-9]*" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white mb-6 text-center tracking-widest" placeholder="PASSWORD" onkeyup="if(window.event.keyCode==13){checkPassword()}">
+            <button onclick="checkPassword()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all">확인</button>
+            <p id="errorMsg" class="text-red-500 text-xs mt-4 hidden font-kor">⛔ 비밀번호가 올바르지 않습니다.</p>
+        </div>
+    </div>
+
+    <div class="slides-container" id="mainContent" style="display: none;">
+        <div class="slides-wrapper" id="slidesWrapper">
+            </div>
+    </div>
+
+    <div class="slide-nav">
+        <button class="nav-btn" id="prevBtn" title="이전 슬라이드">‹</button>
+        <div class="pdf-menu-container">
+            <button class="nav-btn" id="pdfBtn" title="PDF 다운로드" style="font-size: 14px;">💾</button>
+            <div class="pdf-menu" id="pdfMenu">
+                <div class="pdf-menu-item" onclick="generatePDF(false)">
+                    <span>📄</span>
+                    <span>일반 저장</span>
+                </div>
+                <div class="pdf-menu-item" onclick="generatePDF(true)">
+                    <span>🔒</span>
+                    <span>워터마크 포함</span>
+                </div>
+            </div>
+        </div>
+        <div class="slide-indicator" id="slideIndicator"></div>
+        <div class="slide-counter">
+            <span id="currentSlide">1</span> / <span id="totalSlides">0</span>
+        </div>
+        <button class="nav-btn" id="nextBtn" title="다음 슬라이드">›</button>
+    </div>
+
+    <div id="pdfLoading" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; color: white;">
+        <div style="width: 40px; height: 40px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin-top: 20px;">PDF 생성 중... <span id="pdfProgress">0%</span></p>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    </div>
+
+    <!-- 이미지 모달 -->
+    <div id="imageModal" class="fixed inset-0 z-[99998] bg-black/90 backdrop-blur-sm hidden items-center justify-center p-4" onclick="closeImageModal(event)">
+        <div class="relative max-w-[95vw] max-h-[95vh] flex items-center justify-center">
+            <button onclick="closeImageModal()" class="absolute top-4 right-4 z-10 bg-black/60 hover:bg-black/80 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold transition-all" title="닫기 (ESC)">×</button>
+            <img id="modalImage" src="" alt="" class="max-w-full max-h-[95vh] object-contain rounded-lg shadow-2xl" onclick="event.stopPropagation()" />
+            <div id="modalCaption" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded text-sm pointer-events-none"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==================================================================================
+        // 🖼️ 이미지 모달 함수
+        // ==================================================================================
+        function openImageModal(imgUrl, caption) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalCaption = document.getElementById('modalCaption');
+            
+            if (modal && modalImage) {
+                modalImage.src = imgUrl;
+                modalImage.alt = caption || '';
+                if (modalCaption) {
+                    modalCaption.textContent = caption || '';
+                    modalCaption.style.display = caption ? 'block' : 'none';
+                }
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+            }
+        }
+
+        function closeImageModal(event) {
+            // 이미지 자체를 클릭한 경우는 닫지 않음
+            if (event && event.target && event.target.id === 'modalImage') {
+                return;
+            }
+            
+            const modal = document.getElementById('imageModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = ''; // 배경 스크롤 복원
+            }
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('imageModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeImageModal();
+                }
+            }
+        });
+
+        // ==================================================================================
+        // 🛠️ 통합 설정 (여기서 데이터를 수정/추가/삭제하면 페이지가 자동 반영됩니다)
+        // ==================================================================================
+        const REPORT_CONFIG = {
+            settings: {
+                password: "1234", // 필요시 변경하세요
+                naverMapId: "", // 네이버 지도 API Client ID가 있다면 입력 (없으면 이미지로 대체됨)
+                pageTitle: "안성 가유 일반산업단지 입지 및 투자 타당성 분석",
+                copyright: "COPYRIGHT © 2025 K-TECHNO VALLEY. ALL RIGHTS RESERVED."
+            },
+            
+            pages: [
+                // 1. 표지: 전문적인 타당성 검토 보고서 스타일
+                {
+                    type: 'cover',
+                    data: {
+                        recipient: "귀사 제안",
+                        proposalLabel: "SITE ACQUISITION FEASIBILITY REPORT",
+                        title: "안성 가유 일반산업단지<br>입지 및 투자 타당성 분석",
+                        subtitle: "수도권 남부 반도체 클러스터 핵심 배후 거점",
+                        desc: "화학(C20)·금속(C25) 입주 확정 / <strong class='text-cyan'>평당 197만 원</strong> 가격 경쟁력 확보",
+                        authorLabel: "제안사",
+                        proposer: "(주)K-Techno Valley / 한솔아이원스(주)",
+                        date: "2025. 04.",
+                        code: "CONFIDENTIAL REP-2025-04"
+                    }
+                },
+
+                // 2. 사업지 개요: 객관적 스펙 명시 (Fact Sheet)
+                {
+                    type: 'split_map',
+                    header: { section: "Ⅰ. 사업지 개요", title: "Project Overview (Fact Sheet)" },
+                    data: {
+                        list: [
+                            { label: "사업명", value: "안성 가유 일반산업단지 조성사업", highlight: true },
+                            { label: "위치", value: "경기도 안성시 고삼면 가유리 777-1번지 일원" },
+                            { label: "총 면적", value: "109,435㎡ (약 33,104평)" },
+                            { label: "용도지역", value: "일반산업단지 (건폐율 70% / 용적률 350%)" },
+                            { label: "공급가", value: "평당 197만 원 (수도권 최저 수준)", color: "text-cyan" }
+                        ],
+                        address: "경기도 안성시 고삼면 가유리 777-1",
+                        // 지도 이미지는 사용자가 업로드한 파일이나 기본 이미지를 사용하도록 설정
+                        mapImageUrl: "https://i.ibb.co/gLbhwqsD/20251213-132415.png", 
+                        naverMapUrl: "https://map.naver.com/v5/search/경기도 안성시 고삼면 가유리 777-1"
+                    }
+                },
+
+                // 3. 핵심 지표 (KPI): 전략적 가치 강조
+                {
+                    type: 'grid_kpi',
+                    header: { section: "Ⅰ. 사업지 개요", title: "Key Strategic Indicators" },
+                    data: {
+                        cards: [
+                            { icon: "🏭", title: "SCARCITY", value: "C20/25", unit: "코드", desc: "화학/금속 업종 허가", sub: "수도권 내 인허가 희소성 극대화", color: "blue-500" },
+                            { icon: "🏗️", title: "EFFICIENCY", value: "350", unit: "%", desc: "압도적 용적률 확보", sub: "토지 활용도 최상 (건폐율 70%)", color: "cyan-400" },
+                            { icon: "📉", title: "VALUATION", value: "197", unit: "만원", desc: "확실한 가격 우위", sub: "인근 시세 대비 40~60% 수준", color: "emerald-500" },
+                            { icon: "🛣️", title: "ACCESS", value: "5.8", unit: "km", desc: "고삼IC 접근성", sub: "세종-포천고속도로 10분 내 진입", color: "indigo-500" }
+                        ]
+                    }
+                },
+
+                // 4. 업종 분석 (핵심): C20, C25 강조 및 전체 코드 나열
+                {
+                    type: 'double_card',
+                    header: { section: "Ⅱ. 입주 여건 분석", title: "입주 가능 업종 (Industry Codes)" },
+                    data: {
+                        left: {
+                            icon: "⭐", title: "Strategic Merit (핵심 희소 업종)",
+                            highlightBox: { label: "규제 극복", value: "C20 / C25 입주 확정" },
+                            list: [
+                                "<strong>C20 화학물질 및 화학제품</strong> (의약품 제외)",
+                                "<strong>C25 금속가공제품</strong> (기계 및 가구 제외)",
+                                "수도권 과밀억제권역 내 인허가 난이도 최상 업종",
+                                "환경오염 저감 대책 및 오폐수 처리 인프라 완비"
+                            ],
+                            note: { title: "Scarcity Value", desc: "경기 남부권 신규 산단 중 화학/금속 처리가 가능한 부지는 극히 제한적임." }
+                        },
+                        right: {
+                            icon: "📋", title: "General Manufacturing (일반 제조)",
+                            highlightBox: { label: "첨단 제조 특화", value: "반도체 소부장 밸류체인" },
+                            list: [
+                                "C26 전자부품/컴퓨터/통신장비, C27 의료/정밀/광학기기",
+                                "C28 전기장비, C29 기타 기계 및 장비",
+                                "C30 자동차/트레일러, C31 기타 운송장비",
+                                "C33 기타제품, D35114 태양력 발전업"
+                            ],
+                            tag: "다양한 제조 업종 수용 가능",
+                            note: { title: "Cluster Effect", desc: "삼성/SK 반도체 클러스터 배후 지원을 위한 최적의 업종 포트폴리오 구성." }
+                        }
+                    }
+                },
+
+                // 5. 입지 분석: 물류 및 배후 수요
+                {
+                    type: 'split_list_img',
+                    header: { section: "Ⅲ. 입지 환경 분석", title: "Logistics & Cluster Network" },
+                    data: {
+                        items: [
+                            { title: "반도체 클러스터 연계성", desc: "• <strong>용인 반도체 국가산단(삼성) 13km</strong>, 용인 반도체 클러스터(SK) 14km 인접.<br>• K-반도체 벨트의 핵심 배후 생산 기지로 기능하며 물류 이동 최적화." },
+                            { title: "광역 교통망 인프라", desc: "• <strong>세종-포천고속도로 고삼IC 5.8km</strong> (차량 10분 내 진입).<br>• 반도체 고속도로(계획) 및 평택-부발선 철도 추진에 따른 미래 접근성 향상 기대." },
+                            { title: "배후 도시 및 인력 수급", desc: "• 안성시 반도체 소부장 특화단지 지정 및 인근 이동읍 신도시 개발.<br>• 직주근접 환경 개선 및 전문 기술 인력 확보 용이." },
+                        ],
+                        imgUrl: "https://i.ibb.co/gLbhwqsD/20251213-132415.png", // 교통망도 이미지
+                        imgCaption: "※ 사업지 광역 교통망 및 주요 산업단지 위치도"
+                    }
+                },
+
+                // 6. 경제성 분석: 가격 비교 차트
+                {
+                    type: 'chart_economy',
+                    header: { section: "Ⅳ. 경제성 분석", title: "Comparative Market Analysis" },
+                    data: {
+                        chartTitle: "인근 주요 산업단지 평당 분양가 비교 (단위: 만원)",
+                        chartLabels: ["본 사업지", "평택/화성 일반산단", "용인 원삼/남사 인근"],
+                        chartData: [197, 350, 500],
+                        chartDesc: "인근 시세 대비 <span class='text-white'>확실한 가격 우위</span> 확보",
+                        capexList: [
+                            { label: "용인 반도체 클러스터 인근", price: "약 500만/평", style: "" },
+                            { label: "안성 가유 산단 (본 건)", price: "197만/평", style: "accent" },
+                            { label: "예상 시세 차익", price: "확실한 Safety Margin", style: "text-emerald-400" }
+                        ],
+                        notes: [
+                            { title: "Value Proposition", desc: "토지비 절감을 통해 건축 및 설비 투자(CAPEX) 여력 확보 가능하며, 향후 지가 상승에 따른 자본 이득(Capital Gain) 기대." },
+                            { title: "Incentives", desc: "법인세 4년간 100% 감면(과밀억제권역 이전 시), 취득세 75% 감면 등 강력한 세제 혜택 지원." }
+                        ]
+                    }
+                },
+
+                // 7. 결론: 요약 및 제안
+                {
+                    type: 'conclusion',
+                    data: {
+                        title: "성공적인 기업 확장을 위한<br>전략적 자산 취득 제안",
+                        desc: "C20/C25 희소 업종의 인허가 가치와 197만 원의 경제성을 동시에 확보하십시오.<br>귀사의 합리적인 의사결정을 기대합니다.",
+                        
+                        // 회사 정보
+                        companyName: "(주)K-Techno Valley",
+                        companyAddress: "경기도 안성시 고삼면 가유리 777-1번지 일원 (현장 사무소)",
+                        registrationNum: "분양 대행사",
+                        ceoName: "대표이사",
+                        companyPhone: "-",
+                        
+                        // 담당자 정보 (공란 요청 반영)
+                        contactTitle: "분양 문의 (Contact)",
+                        mobile: "010-XXXX-XXXX", // 실제 전화번호로 수정하세요
+                        email: "contact@email.com" // 실제 이메일로 수정하세요
+                    }
+                }
+            ]
+        };
+
+        // ==================================================================================
+        // 🎨 페이지 템플릿 (각 type에 맞는 HTML을 생성하는 함수들)
+        // ==================================================================================
+        const TEMPLATES = {
+            // [1] 표지
+            cover: (d) => `
+                <div class="absolute top-12 right-12 z-20 text-right">
+                    <h3 class="font-kor text-xl font-bold text-white tracking-wide">${d.recipient}</h3>
+                </div>
+                <div class="relative z-10 h-full flex flex-col justify-center pl-20 pr-10">
+                    <div class="border-l-4 border-accent pl-6 mb-8">
+                        <p class="font-eng text-accent text-lg tracking-[0.4em] font-bold">${d.proposalLabel || 'INVESTMENT PROPOSAL'}</p>
+                    </div>
+                    <h1 class="font-eng text-[5rem] font-black leading-tight text-white">${d.title}</h1>
+                    <div class="mt-8 pl-2">
+                        <h2 class="font-kor text-3xl text-white font-bold mb-2">${d.subtitle}</h2>
+                        <p class="font-kor text-slate-400 text-xl font-light mb-10">${d.desc}</p>
+                        <div class="inline-flex items-center gap-4">
+                            <span class="font-eng text-sm text-accent tracking-widest">${d.authorLabel || '작성자'}</span>
+                            <span class="font-kor text-2xl font-bold text-white">${d.proposer}</span>
+                        </div>
+                    </div>
+                    <div class="absolute bottom-12 left-20 flex gap-8 text-slate-500 font-eng text-sm tracking-widest">
+                        <span>${d.date}</span><span>${d.code}</span>
+                    </div>
+                </div>`,
+
+            // [2] 지도 + 리스트 (사업지 개요)
+            split_map: (d, h) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 gap-10 h-[calc(100%-120px)]">
+                    <div class="flex flex-col gap-6">
+                        <div class="glass-panel p-8 rounded-2xl flex-1">
+                            <h3 class="font-kor text-xl font-bold text-white mb-6 border-l-4 border-accent pl-4">${h.title}</h3>
+                            <ul class="space-y-6 font-kor text-base">
+                                ${d.list.map(item => `<li class="flex border-b border-slate-700/50 pb-3"><span class="w-32 text-slate-400">${item.label}</span><span class="flex-1 ${item.color || 'text-white'} ${item.highlight ? 'font-bold' : ''}">${item.value}</span></li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-full bg-slate-800 rounded-2xl overflow-hidden border border-slate-600 group cursor-pointer" onclick="window.open('${d.naverMapUrl || `https://map.naver.com/v5/search/${encodeURIComponent(d.address)}`}', '_blank')" title="클릭하여 네이버 지도에서 보기">
+                        <img src="${d.mapImageUrl || `https://maps.google.com/maps?q=${encodeURIComponent(d.address)}&output=embed&z=15`}" alt="지도" class="w-full h-full object-cover" style="display: block;" />
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center pointer-events-none">
+                            <span class="opacity-0 group-hover:opacity-100 text-white font-kor text-lg font-bold bg-black/50 px-4 py-2 rounded transition-opacity duration-300">🗺️ 네이버 지도에서 보기</span>
+                        </div>
+                    </div>
+                </div>`,
+
+            // [3] KPI 그리드
+            grid_kpi: (d, h) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 grid-rows-2 gap-6 h-[calc(100%-120px)]">
+                    ${d.cards.map(c => `
+                        <div class="glass-panel p-8 rounded-2xl border-l-8 border-${c.color} relative group hover:-translate-y-1 transition overflow-hidden">
+                            <div class="absolute right-4 top-4 text-7xl opacity-10 select-none pointer-events-none">${c.icon}</div>
+                            <p class="font-eng text-slate-400 text-sm tracking-wider mb-2 relative z-10">${c.title}</p>
+                            <p class="font-eng text-6xl font-black text-white relative z-10">${c.value} <span class="text-3xl ${c.color.includes('cyan') ? 'text-cyan-400' : 'text-accent'}">${c.unit}</span></p>
+                            <p class="font-kor text-${c.color.replace('500','300').replace('400','300')} font-bold mt-4 text-lg relative z-10">${c.desc}</p>
+                            <p class="font-kor text-slate-500 text-sm mt-1 relative z-10">${c.sub}</p>
+                        </div>
+                    `).join('')}
+                </div>`,
+
+            // [4] 리스트 + 이미지 1개
+            split_list_img: (d, h) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-3 gap-8 h-[calc(100%-120px)]">
+                    <div class="col-span-1 flex flex-col gap-6 h-full">
+                        ${d.items.map((item, idx) => {
+                            const colors = [{t:'text-blue-400',b:'border-blue-500'}, {t:'text-cyan-400',b:'border-cyan-500'}, {t:'text-emerald-400',b:'border-emerald-500'}];
+                            const theme = colors[idx % 3];
+                            return `<div class="glass-panel p-6 rounded-xl border-l-4 ${theme.b} flex-1 flex flex-col justify-center"><h3 class="font-kor text-xl font-bold ${theme.t} mb-3">${item.title}</h3><p class="font-kor text-slate-300 text-sm leading-relaxed">${item.desc}</p></div>`;
+                        }).join('')}
+                    </div>
+                    <div class="col-span-2 bg-slate-800 rounded-2xl overflow-hidden border border-slate-600 relative group cursor-pointer" onclick="openImageModal('${d.imgUrl}', '${d.imgCaption.replace(/'/g, "\\'")}')" title="클릭하여 원본 크기로 보기">
+                        <img src="${d.imgUrl}" alt="${d.imgCaption}" class="w-full h-full object-cover" style="display: block;" />
+                        <div class="absolute bottom-6 left-6 bg-black/60 px-4 py-2 rounded pointer-events-none"><span class="text-white text-sm">${d.imgCaption}</span></div>
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center pointer-events-none">
+                            <span class="opacity-0 group-hover:opacity-100 text-white font-kor text-lg font-bold bg-black/50 px-4 py-2 rounded transition-opacity duration-300">🔍 클릭하여 확대</span>
+                        </div>
+                    </div>
+                </div>`,
+
+            // [5] 2개 카드 (전력/인허가)
+            double_card: (d, h) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 gap-10 h-[calc(100%-120px)]">
+                    ${[d.left, d.right].map((item, idx) => `
+                        <div class="glass-panel p-8 rounded-2xl flex flex-col">
+                            <h3 class="font-kor text-2xl font-bold ${idx===0?'text-accent':'text-cyan'} mb-6 flex items-center gap-3"><span class="text-3xl">${item.icon}</span> ${item.title}</h3>
+                            <div class="space-y-6 mb-6">
+                                <div class="bg-${idx===0?'blue':'cyan'}-900/30 p-5 rounded-xl border border-${idx===0?'blue':'cyan'}-500/30">
+                                    <span class="block text-slate-400 text-sm mb-1">${item.highlightBox.label}</span>
+                                    <span class="block text-white text-3xl font-bold">${item.highlightBox.value}</span>
+                                </div>
+                                <ul class="font-kor text-slate-300 space-y-3">
+                                    ${item.list.map(l => `<li class="flex items-start gap-2"><span class="${idx===0?'text-accent':'text-cyan'}">✔</span><span>${l}</span></li>`).join('')}
+                                </ul>
+                                ${item.tag ? `<div class="mt-4 text-center"><span class="inline-block bg-emerald-600 text-white text-sm font-bold px-4 py-2 rounded-full">${item.tag}</span></div>` : ''}
+                            </div>
+                            <div class="mt-auto bg-slate-800/50 p-5 rounded-xl border border-slate-600/30">
+                                <h4 class="font-eng text-slate-400 text-xs font-bold mb-2 tracking-wider">${item.note.title}</h4>
+                                <p class="font-kor text-slate-300 text-sm leading-relaxed">${item.note.desc}</p>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>`,
+
+            // [6] 텍스트 + 차트 (Risk)
+            chart_risk: (d, h, pageId) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 gap-12 h-[calc(100%-120px)]">
+                    <div class="flex flex-col gap-8 h-full">
+                        <div class="prose mt-4">${d.mainText}</div>
+                        <div class="glass-panel p-6 rounded-xl border-l-4 border-accent mt-auto">
+                            <h4 class="font-kor text-xl font-bold text-accent mb-2">💡 Strategic Value</h4>
+                            <p class="font-kor text-slate-300 text-sm">${d.subText}</p>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-8 rounded-2xl flex flex-col">
+                        <h3 class="font-kor text-lg font-bold text-white mb-6 text-center">지역별 전력 공급 거부 확률</h3>
+                        <div class="flex-1 relative"><canvas id="${pageId}_chart"></canvas></div>
+                    </div>
+                </div>`,
+
+            // [7] 차트 + 리스트 (Economy)
+            chart_economy: (d, h, pageId) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 gap-10 h-[calc(100%-120px)]">
+                    <div class="glass-panel p-8 rounded-2xl flex flex-col">
+                        <h3 class="font-kor text-xl font-bold text-white mb-4 border-b border-slate-600 pb-2">${d.chartTitle}</h3>
+                        <div class="h-56 relative mb-4"><canvas id="${pageId}_chart"></canvas></div>
+                        <div class="text-center text-accent font-bold mb-6">${d.chartDesc}</div>
+                        <div class="mt-auto bg-slate-800/50 p-5 rounded-xl border border-slate-600/30">
+                            <h4 class="font-eng text-slate-400 text-xs font-bold mb-2 tracking-wider">${d.notes[0].title}</h4>
+                            <p class="font-kor text-slate-300 text-sm leading-relaxed">${d.notes[0].desc}</p>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-8 rounded-2xl flex flex-col">
+                        <h3 class="font-kor text-xl font-bold text-white mb-4 border-b border-slate-600 pb-2">💰 CAPEX 경쟁력: 토지비</h3>
+                        <div class="space-y-6 mt-6 mb-6">
+                            ${d.capexList.map(i => {
+                                const style = i.style === 'accent' ? 'p-6 bg-blue-900/40 border-2 border-accent transform scale-105 shadow-lg' : `p-4 bg-slate-800 ${i.style}`;
+                                const textStyle = i.style === 'accent' ? 'text-2xl' : 'font-bold';
+                                const labelColor = i.style === 'accent' ? 'text-accent' : 'text-slate-400';
+                                return `<div class="flex items-center justify-between rounded-lg ${style}"><span class="${labelColor} ${i.style==='accent'?'font-bold text-lg':''}">${i.label}</span><span class="text-white font-bold ${textStyle}">${i.price}</span></div>`;
+                            }).join('')}
+                        </div>
+                        <div class="mt-auto bg-slate-800/50 p-5 rounded-xl border border-slate-600/30">
+                            <h4 class="font-eng text-slate-400 text-xs font-bold mb-2 tracking-wider">${d.notes[1].title}</h4>
+                            <p class="font-kor text-slate-300 text-sm leading-relaxed">${d.notes[1].desc}</p>
+                        </div>
+                    </div>
+                </div>`,
+
+            // [8] SWOT
+            swot: (d, h) => {
+                const map = { S: {c:'blue', t:'STRENGTH'}, W: {c:'slate', t:'WEAKNESS'}, O: {c:'red', t:'OPPORTUNITY'}, T: {c:'yellow', t:'THREAT'} };
+                return `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 gap-6 h-[calc(100%-120px)]">
+                    ${Object.entries(d).map(([key, items]) => `
+                        <div class="bg-slate-800/80 p-6 rounded-xl border-t-4 border-${map[key].c}-500">
+                            <h4 class="font-eng text-${map[key].c}-400 font-bold mb-3 text-3xl">${map[key].t} (${key})</h4>
+                            <ul class="text-slate-300 text-l space-y-2 list-disc pl-5">${items.map(i => `<li>${i}</li>`).join('')}</ul>
+                        </div>
+                    `).join('')}
+                </div>`;
+            },
+
+            // [9] Zoning
+            zoning: (d, h) => `
+                ${getHeader(h)}
+                <div class="grid grid-cols-2 gap-10 h-[calc(100%-120px)]">
+                    <div class="flex flex-col gap-6">
+                        <div class="glass-panel p-8 rounded-2xl flex-1 border-l-4 border-white">
+                            <h3 class="font-eng text-2xl font-bold text-white mb-6">ZONING PLAN</h3>
+                            <div class="space-y-6">
+                                ${d.zones.map(z => `<div class="bg-${z.color}-900/30 p-5 rounded-xl border border-${z.color}-500/30"><span class="text-${z.color==='blue'?'accent':'amber-400'} font-bold text-lg block mb-2">${z.title}</span><p class="text-slate-300 text-m">${z.desc}</p></div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="relative bg-slate-800 rounded-2xl overflow-hidden border border-slate-600 group cursor-pointer" onclick="openImageModal('${d.imgUrl}', '${d.imgCaption.replace(/'/g, "\\'")}')" title="클릭하여 원본 크기로 보기">
+                        <img src="${d.imgUrl}" alt="${d.imgCaption}" class="w-full h-full object-cover" style="display: block;" />
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div class="text-center p-6 bg-black/50 backdrop-blur rounded-xl border border-slate-500">
+                                <span class="block text-4xl mb-2">🏗️</span>
+                                <span class="text-white font-kor font-bold">${d.imgCaption}</span>
+                            </div>
+                        </div>
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center pointer-events-none">
+                            <span class="opacity-0 group-hover:opacity-100 text-white font-kor text-lg font-bold bg-black/50 px-4 py-2 rounded transition-opacity duration-300">🔍 클릭하여 확대</span>
+                        </div>
+                    </div>
+                </div>`,
+
+            // [10] 결론 (수정됨: 데이터 연동형 명함 스타일)
+            conclusion: (d) => `
+                <div class="relative z-10 w-full h-full flex flex-col items-center justify-center px-20">
+                    <div class="text-center mb-16">
+                        <h2 class="font-eng text-accent text-lg tracking-[0.6em] font-bold mb-6 animate-fade-up opacity-0" style="animation-delay: 0.1s; animation-fill-mode: forwards;">CONCLUSION</h2>
+                        <h1 class="font-kor text-5xl font-bold text-white leading-tight mb-8 animate-fade-up opacity-0" style="animation-delay: 0.2s; animation-fill-mode: forwards;">${d.title}</h1>
+                        <p class="font-kor text-xl text-slate-400 font-light leading-relaxed animate-fade-up opacity-0" style="animation-delay: 0.3s; animation-fill-mode: forwards;">${d.desc}</p>
+                    </div>
+                    
+                    <div class="w-full max-w-4xl animate-fade-up opacity-0" style="animation-delay: 0.4s; animation-fill-mode: forwards;">
+                        <div class="bg-slate-800 rounded-2xl p-10 border border-slate-700 shadow-xl relative overflow-hidden">
+                            
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-10">
+                                <div class="flex-1 border-l-4 border-slate-600 pl-6">
+                                    <h3 class="font-kor text-white text-2xl font-bold mb-3 tracking-tight">${d.companyName}</h3>
+                                    <p class="font-kor text-slate-400 text-sm mb-6 font-light">${d.companyAddress}</p>
+                                    
+                                    <div class="grid grid-cols-2 gap-y-2 gap-x-8 font-kor text-sm text-slate-500">
+                                        <div class="flex gap-2"><span>등록번호</span> <span class="text-slate-300">${d.registrationNum}</span></div>
+                                        <div class="flex gap-2"><span>대표자</span> <span class="text-slate-300">${d.ceoName}</span></div>
+                                        <div class="flex gap-2 col-span-2"><span>대표전화</span> <span class="text-slate-300">${d.companyPhone}</span></div>
+                                    </div>
+                                </div>
+
+                                <div class="text-right min-w-[240px]">
+                                    <p class="font-kor text-accent text-sm font-bold tracking-wider mb-2 uppercase">${d.contactTitle}</p>
+                                    <p class="font-eng text-white text-4xl font-black tracking-tight mb-2">${d.mobile}</p>
+                                    <p class="font-eng text-slate-400 text-base border-b border-slate-600 inline-block pb-1">${d.email}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`,
+        };
+
+        // 헬퍼: 헤더 HTML 생성기
+        function getHeader(h) {
+            if(!h) return '';
+            return `
+            <header class="flex items-end justify-between border-b border-slate-700 pb-6 mb-8">
+                <div><h2 class="font-kor text-4xl font-bold text-white tracking-tight">${h.section}</h2></div>
+                <p class="font-kor text-slate-400 text-lg">${h.title}</p>
+            </header>`;
+        }
+
+        // ==================================================================================
+        // 🚀 초기화 및 렌더링
+        // ==================================================================================
+        let currentSlideIndex = 0;
+        let slides = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // 페이지 제목 설정
+            if (REPORT_CONFIG.settings.pageTitle) {
+                document.title = REPORT_CONFIG.settings.pageTitle;
+            }
+            
+            // 모바일에서 비밀번호 입력창 포커스 시 자동 스크롤 처리
+            const passwordInput = document.getElementById('passwordInput');
+            if (passwordInput) {
+                passwordInput.addEventListener('focus', function() {
+                    // 모바일 환경 확인
+                    if (window.innerWidth <= 768) {
+                        // 입력창이 보이도록 스크롤
+                        setTimeout(() => {
+                            this.scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'center',
+                                inline: 'nearest'
+                            });
+                        }, 300); // 키패드가 올라올 시간을 고려한 지연
+                    }
+                });
+            }
+            
+            initSecurity();
+            renderApp();
+            
+            // 네비게이션 바 자동 숨김 기능 (PC에서만)
+            const isMobileOnLoad = window.innerWidth <= 768;
+            if (!isMobileOnLoad) {
+                let hideNavTimer = null;
+                const navBar = document.querySelector('.slide-nav');
+                const HIDE_DELAY = 2500; // 2.5초 후 자동 숨김
+
+                function showNavBar() {
+                    if (navBar) {
+                        navBar.classList.add('show');
+                        // 타이머 리셋
+                        clearTimeout(hideNavTimer);
+                        hideNavTimer = setTimeout(() => {
+                            navBar.classList.remove('show');
+                        }, HIDE_DELAY);
+                    }
+                }
+
+                // 마우스 움직임 감지
+                document.addEventListener('mousemove', () => {
+                    showNavBar();
+                });
+
+                // 네비게이션 바에 마우스 호버 시 숨김 방지
+                if (navBar) {
+                    navBar.addEventListener('mouseenter', () => {
+                        clearTimeout(hideNavTimer);
+                        navBar.classList.add('show');
+                    });
+                    navBar.addEventListener('mouseleave', () => {
+                        hideNavTimer = setTimeout(() => {
+                            navBar.classList.remove('show');
+                        }, HIDE_DELAY);
+                    });
+                }
+
+                // 초기 로드 시 2초 후 자동 숨김
+                setTimeout(() => {
+                    if (navBar) {
+                        navBar.classList.add('show');
+                        hideNavTimer = setTimeout(() => {
+                            navBar.classList.remove('show');
+                        }, HIDE_DELAY);
+                    }
+                }, 1000);
+            }
+        });
+
+        function renderApp() {
+            const wrapper = document.getElementById('slidesWrapper');
+            wrapper.innerHTML = ''; // 기존 내용 초기화
+
+            // 1. Config에 따라 HTML 생성
+            REPORT_CONFIG.pages.forEach((page, index) => {
+                const section = document.createElement('section');
+                section.className = `slide-page ${page.type === 'cover' ? '' : 'p-12 bg-slate-900'} ${page.type === 'conclusion' ? 'flex flex-col justify-center items-center' : ''}`;
+                section.id = `page_${index}`;
+                
+                // 템플릿 실행
+                if (TEMPLATES[page.type]) {
+                    // 차트용 ID 생성을 위해 index 전달
+                    section.innerHTML = TEMPLATES[page.type](page.data, page.header, `page_${index}`);
+                }
+                wrapper.appendChild(section);
+            });
+
+            // 2. 차트 렌더링 (HTML 생성 후 실행)
+            initCharts();
+
+            // 3. 슬라이드 기능 초기화 (PC에서만)
+            const isMobile = window.innerWidth <= 768;
+            if (!isMobile) {
+                initSlides();
+            }
+        }
+
+        function initCharts() {
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
+            
+            REPORT_CONFIG.pages.forEach((page, index) => {
+                const canvasId = `page_${index}_chart`;
+                const canvas = document.getElementById(canvasId);
+                
+                if (canvas && page.type === 'chart_risk') {
+                    new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: page.data.chartLabels,
+                            datasets: [{
+                                label: '확률 (%)',
+                                data: page.data.chartData,
+                                backgroundColor: ['#ef4444', '#3b82f6'],
+                                borderRadius: 4,
+                                minBarLength: 20
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, grid: { color: '#334155' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+                    });
+                } else if (canvas && page.type === 'chart_economy') {
+                     new Chart(canvas, {
+                        type: 'bar',
+                        indexAxis: 'y',
+                        data: {
+                            labels: page.data.chartLabels,
+                            datasets: [{
+                                label: '비용 (10억)',
+                                data: page.data.chartData,
+                                backgroundColor: ['#475569', '#3b82f6'],
+                                borderRadius: 4
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: '#334155' } } } }
+                    });
+                }
+            });
+        }
+
+        // ==================================================================================
+        // 🎞️ 슬라이드 네비게이션 로직
+        // ==================================================================================
+        function initSlides() {
+            slides = document.querySelectorAll('.slide-page');
+            const totalSlidesEl = document.getElementById('totalSlides');
+            if (totalSlidesEl) {
+                totalSlidesEl.textContent = slides.length;
+            }
+            updateSlidePosition();
+            createIndicators();
+            updateNavigation();
+            
+            // 네비게이션 버튼 이벤트 리스너 등록 (PC에서만)
+            const isMobile = window.innerWidth <= 768;
+            if (!isMobile) {
+                const prevBtn = document.getElementById('prevBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                if (prevBtn && nextBtn) {
+                    prevBtn.addEventListener('click', prevSlide);
+                    nextBtn.addEventListener('click', nextSlide);
+                }
+            }
+        }
+
+        function updateSlidePosition() {
+            const wrapper = document.getElementById('slidesWrapper');
+            const isMobile = window.innerWidth <= 768;
+            
+            if (isMobile) {
+                // 모바일: 슬라이드 네비게이션 기능 완전 비활성화
+                // 아무 작업도 하지 않음 (일반 세로 스크롤만 사용)
+                return;
+            }
+            
+            // PC: 기존 가로 슬라이드 방식 (모바일이 아닐 때만 실행)
+            const slideWidth = 1123; 
+            const gap = 20; 
+            const centerPosition = (window.innerWidth - slideWidth) / 2;
+            const currentSlidePosition = currentSlideIndex * (slideWidth + gap);
+            wrapper.style.transform = `translateX(${centerPosition - currentSlidePosition}px)`;
+            
+            slides.forEach((slide, index) => {
+                slide.classList.remove('preview', 'preview-left', 'preview-right');
+                if (index === currentSlideIndex + 1) slide.classList.add('preview', 'preview-right');
+                else if (index === currentSlideIndex - 1) slide.classList.add('preview', 'preview-left');
+                else if (index !== currentSlideIndex) slide.classList.add('preview');
+            });
+            
+            // PC에서만 인디케이터와 카운터 업데이트
+            updateIndicators();
+            const currentSlideEl = document.getElementById('currentSlide');
+            if (currentSlideEl) {
+                currentSlideEl.textContent = currentSlideIndex + 1;
+            }
+            updateNavigation();
+        }
+
+        function createIndicators() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 인디케이터 생성 불필요
+            }
+            
+            const indicator = document.getElementById('slideIndicator');
+            if (!indicator) {
+                return; // 인디케이터 요소가 없으면 종료
+            }
+            
+            indicator.innerHTML = '';
+            slides.forEach((_, i) => {
+                const dot = document.createElement('div');
+                dot.className = `indicator-dot ${i === currentSlideIndex ? 'active' : ''}`;
+                dot.addEventListener('click', () => goToSlide(i));
+                indicator.appendChild(dot);
+            });
+        }
+
+        function updateIndicators() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 인디케이터 업데이트 불필요
+            }
+            
+            const dots = document.querySelectorAll('.indicator-dot');
+            dots.forEach((dot, index) => {
+                if (index === currentSlideIndex) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        function updateNavigation() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 네비게이션 버튼 업데이트 불필요
+            }
+            
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            if (prevBtn && nextBtn) {
+                prevBtn.disabled = currentSlideIndex === 0;
+                nextBtn.disabled = currentSlideIndex === slides.length - 1;
+            }
+        }
+
+        function goToSlide(index) {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 작동하지 않음
+            }
+            
+            if (index >= 0 && index < slides.length) {
+                currentSlideIndex = index;
+                updateSlidePosition();
+                updateNavigation();
+            }
+        }
+
+        function nextSlide() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 작동하지 않음
+            }
+            
+            if (currentSlideIndex < slides.length - 1) {
+                goToSlide(currentSlideIndex + 1);
+            }
+        }
+
+        function prevSlide() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 작동하지 않음
+            }
+            
+            if (currentSlideIndex > 0) {
+                goToSlide(currentSlideIndex - 1);
+            }
+        }
+
+        
+        // 윈도우 리사이즈 시 슬라이드 위치 재조정 (PC에서만)
+        window.addEventListener('resize', () => {
+            const isMobile = window.innerWidth <= 768;
+            if (!isMobile) {
+                updateSlidePosition();
+            }
+        });
+
+        // 키보드 이벤트 리스너 (PC에서만 작동)
+        document.addEventListener('keydown', (e) => {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 키보드 이벤트 무시
+            }
+            
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+                prevSlide();
+            } else if (e.key === 'Home') {
+                goToSlide(0);
+            } else if (e.key === 'End') {
+                goToSlide(slides.length - 1);
+            }
+        });
+
+        // 마우스 휠 이벤트 리스너 (PC에서만 작동)
+        let wheelTimeout = null;
+        let isWheeling = false;
+        
+        document.addEventListener('wheel', (e) => {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                return; // 모바일에서는 마우스 휠 이벤트 무시
+            }
+            
+            // 스크롤이 너무 빠르게 발생하지 않도록 쿨다운 적용
+            if (isWheeling) {
+                return;
+            }
+            
+            // 기본 스크롤 동작 방지
+            e.preventDefault();
+            
+            // 휠 방향에 따라 슬라이드 이동
+            if (e.deltaY > 0) {
+                // 아래로 스크롤 (다음 슬라이드)
+                nextSlide();
+            } else if (e.deltaY < 0) {
+                // 위로 스크롤 (이전 슬라이드)
+                prevSlide();
+            }
+            
+            // 쿨다운 설정 (500ms 동안 추가 휠 이벤트 무시)
+            isWheeling = true;
+            clearTimeout(wheelTimeout);
+            wheelTimeout = setTimeout(() => {
+                isWheeling = false;
+            }, 500);
+        }, { passive: false });
+
+        // ==================================================================================
+        // 🔒 보안 및 PDF
+        // ==================================================================================
+        function initSecurity() {
+            const pw = REPORT_CONFIG.settings.password;
+            if(!pw) checkPassword(true);
+        }
+        function checkPassword(force = false) {
+            const input = document.getElementById('passwordInput');
+            if (force || input.value === REPORT_CONFIG.settings.password) {
+                const layer = document.getElementById('loginLayer');
+                layer.style.opacity = "0";
+                setTimeout(() => { 
+                    layer.style.display = "none"; 
+                    document.getElementById('mainContent').style.display = "block";
+                    const isMobile = window.innerWidth <= 768;
+                    if (!isMobile) {
+                        initSlides();
+                    }
+                }, 500);
+            } else {
+                document.getElementById('errorMsg').classList.remove('hidden');
+                input.value = '';
+            }
+        }
+
+        // 폰트 로딩 완료 대기 함수
+        async function waitForFonts() {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+            // 추가 대기 시간 (폰트 렌더링 완료 보장)
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // PDF 메뉴 표시/숨김 처리
+        const pdfBtn = document.getElementById('pdfBtn');
+        const pdfMenu = document.getElementById('pdfMenu');
+        
+        pdfBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pdfMenu.classList.toggle('show');
+        });
+        
+        // 메뉴 외부 클릭 시 닫기
+        document.addEventListener('click', (e) => {
+            if (!pdfMenu.contains(e.target) && e.target !== pdfBtn) {
+                pdfMenu.classList.remove('show');
+            }
+        });
+        
+        // PDF 생성 함수 (워터마크 옵션 포함)
+        async function generatePDF(includeWatermark = false) {
+            // 메뉴 닫기
+            pdfMenu.classList.remove('show');
+            
+            const { jsPDF } = window.jspdf;
+            const loading = document.getElementById('pdfLoading');
+            const progress = document.getElementById('pdfProgress');
+            loading.style.display = 'flex';
+            
+            try {
+                // 폰트 로딩 완료 대기
+                progress.textContent = '폰트 로딩 중...';
+                await waitForFonts();
+                
+                // 슬라이드 요소 가져오기
+                const slides = document.querySelectorAll('.slide-page');
+                if (!slides || slides.length === 0) {
+                    throw new Error('슬라이드를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+                }
+                
+                const doc = new jsPDF('l', 'mm', 'a4');
+                const pdfWidth = 297;
+                const pdfHeight = 210;
+                
+                const captureContainer = document.createElement('div');
+                Object.assign(captureContainer.style, { 
+                    position: 'fixed', 
+                    top: '0', 
+                    left: '0', 
+                    width: '1123px', 
+                    height: '794px', 
+                    zIndex: '-9999', 
+                    overflow: 'hidden', 
+                    backgroundColor: '#0f172a' 
+                });
+                document.body.appendChild(captureContainer);
+
+                for (let i = 0; i < slides.length; i++) {
+                    progress.textContent = `${Math.round(((i + 1) / slides.length) * 100)}%`;
+                    const clone = slides[i].cloneNode(true);
+                    
+                    // 스타일 초기화
+                    clone.classList.remove('preview', 'preview-left', 'preview-right');
+                    clone.style.transform = 'none';
+                    clone.style.transition = 'none';
+                    clone.style.opacity = '1';
+                    clone.style.filter = 'none';
+                    clone.style.margin = '0';
+                    clone.style.boxShadow = 'none';
+                    
+                    // 현재 슬라이드를 클로저로 저장 (onclone 콜백에서 사용)
+                    const currentSlide = slides[i];
+                    
+                    // 캔버스 복제 (차트용)
+                    const origCanvases = currentSlide.querySelectorAll('canvas');
+                    const cloneCanvases = clone.querySelectorAll('canvas');
+                    if (origCanvases.length > 0) {
+                        origCanvases.forEach((orig, idx) => {
+                            if (cloneCanvases[idx]) {
+                                cloneCanvases[idx].width = orig.width;
+                                cloneCanvases[idx].height = orig.height;
+                                cloneCanvases[idx].getContext('2d').drawImage(orig, 0, 0);
+                            }
+                        });
+                    }
+
+                    captureContainer.appendChild(clone);
+                    
+                    // 이미지 로딩 완료 대기 및 비율 유지 설정 (모든 img 태그)
+                    const images = clone.querySelectorAll('img');
+                    const imagePromises = Array.from(images).map(img => {
+                        if (img.complete && img.naturalWidth > 0) {
+                            // 이미 로드된 이미지의 비율 유지 설정
+                            img.style.objectFit = 'contain';
+                            img.style.objectPosition = 'center';
+                            return Promise.resolve();
+                        }
+                        return new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                // 이미지 로드 완료 후 비율 유지 설정
+                                img.style.objectFit = 'contain';
+                                img.style.objectPosition = 'center';
+                                resolve();
+                            };
+                            img.onerror = () => {
+                                // 에러가 나도 비율 설정은 적용
+                                img.style.objectFit = 'contain';
+                                img.style.objectPosition = 'center';
+                                resolve();
+                            };
+                            setTimeout(() => {
+                                img.style.objectFit = 'contain';
+                                img.style.objectPosition = 'center';
+                                resolve();
+                            }, 5000); // 최대 5초 대기
+                        });
+                    });
+                    await Promise.all(imagePromises);
+                    
+                    // DOM 렌더링 완료 대기 (특히 마지막 페이지)
+                    await new Promise(resolve => {
+                        // requestAnimationFrame을 두 번 사용하여 렌더링 완료 보장
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                // 추가 안전 대기 (마지막 페이지는 더 길게)
+                                setTimeout(resolve, i === slides.length - 1 ? 500 : 200);
+                            });
+                        });
+                    });
+                    
+                    // 마지막 페이지의 경우 추가 스타일 보정
+                    if (i === slides.length - 1) {
+                        clone.style.height = '794px';
+                        clone.style.minHeight = '794px';
+                        clone.style.maxHeight = '794px';
+                        clone.style.overflow = 'visible';
+                    }
+                    
+                    // ============================================================
+                    // 1단계: html2canvas로 페이지를 이미지(Canvas)로 캡처
+                    // ============================================================
+                    let canvas;
+                    let retryCount = 0;
+                    const maxRetries = 3;
+                    
+                    while (retryCount < maxRetries) {
+                        try {
+                            canvas = await html2canvas(clone, { 
+                                scale: 2, // 고해상도 캡처 (2배 스케일로 변경 - 성능 개선)
+                                useCORS: true, 
+                                allowTaint: true, // 외부 이미지 허용
+                                imageTimeout: 30000,
+                                logging: false,
+                                backgroundColor: '#0f172a',
+                                width: 1123,
+                                height: 794,
+                                windowWidth: 1123,
+                                windowHeight: 794,
+                                scrollX: 0,
+                                scrollY: 0,
+                                removeContainer: false, // 컨테이너 제거 방지
+                                foreignObjectRendering: false, // foreignObject 비활성화로 호환성 개선
+                                ignoreElements: (element) => {
+                                    // 호버 메시지 요소만 정확하게 제외
+                                    if (element.tagName === 'SPAN' || element.tagName === 'DIV') {
+                                        const text = element.textContent || '';
+                                        // 직접적인 텍스트만 확인 (자식 요소의 텍스트는 제외)
+                                        if (element.children.length === 0 && (text.includes('클릭하여 확대') || text.includes('네이버 지도에서 보기'))) {
+                                            return true;
+                                        }
+                                    }
+                                    return false;
+                                },
+                                onclone: (clonedDoc, element) => {
+                            // 헬퍼 함수: 요소 경로 생성
+                            function getElementPath(el, root) {
+                                const path = [];
+                                let current = el;
+                                while (current && current !== root) {
+                                    let index = 0;
+                                    let sibling = current.previousElementSibling;
+                                    while (sibling) {
+                                        if (sibling.tagName === current.tagName) index++;
+                                        sibling = sibling.previousElementSibling;
+                                    }
+                                    path.unshift({ tag: current.tagName, index: index, className: current.className });
+                                    current = current.parentElement;
+                                }
+                                return path;
+                            }
+                            
+                            // 헬퍼 함수: 경로로 요소 찾기
+                            function getElementByPath(root, path) {
+                                let current = root;
+                                for (const step of path) {
+                                    const children = Array.from(current.children).filter(
+                                        el => el.tagName === step.tag && el.className === step.className
+                                    );
+                                    if (children[step.index]) {
+                                        current = children[step.index];
+                                    } else {
+                                        return null;
+                                    }
+                                }
+                                return current;
+                            }
+
+                            // 1. [수정됨] 모든 페이지의 애니메이션/투명도 강제 해제 (표지, 결론 페이지 등 공통 적용)
+                            const animateElements = clonedDoc.querySelectorAll('.animate-fade-up, .opacity-0');
+                            animateElements.forEach(el => {
+                                el.style.opacity = '1';       // 투명도 100% 강제
+                                el.style.animation = 'none';  // 애니메이션 중지
+                                el.style.transition = 'none'; // 트랜지션 중지
+                            });
+
+                            // PDF 저장 시 "클릭하여 확대" 및 "네이버 지도에서 보기" 메시지 숨김 처리 (정확한 선택자 사용)
+                            // group-hover:opacity-100 클래스를 가진 span 요소만 찾아서 숨김
+                            const zoomSpans = clonedDoc.querySelectorAll('span[class*="group-hover:opacity"]');
+                            zoomSpans.forEach(el => {
+                                const text = el.textContent || '';
+                                if (text.includes('클릭하여 확대') || text.includes('🔍') || text.includes('네이버 지도에서 보기') || text.includes('🗺️')) {
+                                    el.style.display = 'none';
+                                }
+                            });
+                            
+                            // 호버 오버레이 div 숨김 (더 정확하게)
+                            const hoverOverlays = clonedDoc.querySelectorAll('div[class*="group-hover:opacity"]');
+                            hoverOverlays.forEach(el => {
+                                // 자식 span 중 "클릭하여 확대" 또는 "네이버 지도에서 보기" 텍스트를 가진 것만 확인
+                                const zoomSpan = el.querySelector('span');
+                                if (zoomSpan) {
+                                    const text = zoomSpan.textContent || '';
+                                    if (text.includes('클릭하여 확대') || text.includes('🔍') || text.includes('네이버 지도에서 보기') || text.includes('🗺️')) {
+                                        el.style.display = 'none';
+                                    }
+                                }
+                            });
+
+                            // 이미지 원본 비율 유지 처리 (모든 이미지에 object-fit: contain 적용)
+                            const images = clonedDoc.querySelectorAll('img');
+                            images.forEach(img => {
+                                // object-fit을 contain으로 설정하여 원본 비율 유지
+                                img.style.objectFit = 'contain';
+                                img.style.objectPosition = 'center';
+                                // 이미지가 찌그러지지 않도록 max-width와 max-height 제한
+                                if (!img.style.maxWidth) {
+                                    img.style.maxWidth = '100%';
+                                }
+                                if (!img.style.maxHeight) {
+                                    img.style.maxHeight = '100%';
+                                }
+                            });
+
+                            // 2. 표지 페이지 배경 처리 (기존 로직 유지)
+                            const coverPage = clonedDoc.querySelector('#page_0');
+                            if (coverPage && i === 0) {
+                                // 그라데이션 배경 요소 찾기
+                                const gradientBg = coverPage.querySelector('.bg-gradient-to-br');
+                                if (gradientBg) {
+                                    // Tailwind 그라데이션 클래스 제거
+                                    gradientBg.classList.remove('bg-gradient-to-br', 'from-slate-900', 'via-[#0f172a]', 'to-[#1e3a8a]');
+                                    
+                                    // 배경 이미지 초기화
+                                    gradientBg.style.backgroundImage = 'none';
+                                    
+                                    // 그라데이션 대신 단색 배경 적용 (진한 남색)
+                                    gradientBg.style.backgroundColor = '#0f172a';
+                                }
+                                
+                                // 도트 패턴 배경도 확인
+                                const dotPattern = coverPage.querySelector('[style*="radial-gradient"]');
+                                if (dotPattern) {
+                                    // 도트 패턴의 opacity 보장
+                                    const originalDot = currentSlide.querySelector('[style*="radial-gradient"]');
+                                    if (originalDot) {
+                                        const computedStyle = window.getComputedStyle(originalDot);
+                                        if (computedStyle.opacity) {
+                                            dotPattern.style.opacity = computedStyle.opacity || '0.2';
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 3. 결론 페이지 배경/높이 처리 (기존 로직 유지)
+                            const lastPageIndex = slides.length - 1;
+                            if (i === lastPageIndex) {
+                                const conclusionPage = clonedDoc.querySelector(`#page_${lastPageIndex}`);
+                                if (conclusionPage) {
+                                    // 마지막 페이지 높이 강제 설정
+                                    conclusionPage.style.height = '794px';
+                                    conclusionPage.style.minHeight = '794px';
+                                    conclusionPage.style.maxHeight = '794px';
+                                    conclusionPage.style.overflow = 'visible';
+                                    
+                                    // 배경 이미지 요소 찾아서 제거 또는 숨김
+                                    const conclusionBg = conclusionPage.querySelector('[style*="background-image"]');
+                                    if (conclusionBg) {
+                                        conclusionBg.style.display = 'none';
+                                        conclusionBg.style.backgroundImage = 'none';
+                                        conclusionBg.style.opacity = '0';
+                                    }
+                                    // data-img 속성이 있는 요소도 확인
+                                    const dataImgBg = conclusionPage.querySelector('[data-img]');
+                                    if (dataImgBg) {
+                                        dataImgBg.style.display = 'none';
+                                        dataImgBg.style.backgroundImage = 'none';
+                                        dataImgBg.style.opacity = '0';
+                                    }
+                                }
+                            }
+                            
+                            // 4. 폰트 강제 적용 (기존 로직 유지 - PDF에서 폰트 렌더링 보장)
+                            const allTextElements = clonedDoc.querySelectorAll('*');
+                            allTextElements.forEach(clonedEl => {
+                                // 원본 슬라이드에서 동일한 위치의 요소 찾기
+                                const clonedPath = getElementPath(clonedEl, clonedDoc);
+                                const originalEl = getElementByPath(currentSlide, clonedPath);
+                                
+                                if (originalEl) {
+                                    try {
+                                        const computedStyle = window.getComputedStyle(originalEl);
+                                        clonedEl.style.fontFamily = computedStyle.fontFamily || "'Noto Sans KR', 'Montserrat', sans-serif";
+                                        clonedEl.style.fontWeight = computedStyle.fontWeight || 'normal';
+                                        clonedEl.style.fontSize = computedStyle.fontSize || 'inherit';
+                                        clonedEl.style.fontStyle = computedStyle.fontStyle || 'normal';
+                                        // 텍스트 색상도 명시적으로 설정
+                                        if (computedStyle.color) {
+                                            clonedEl.style.color = computedStyle.color;
+                                        }
+                                    } catch (e) {
+                                        // 폰트 적용 실패 시 기본값 사용
+                                        clonedEl.style.fontFamily = "'Noto Sans KR', 'Montserrat', sans-serif";
+                                    }
+                                } else {
+                                    // 원본을 찾지 못한 경우 기본 폰트 적용
+                                    if (clonedEl.tagName && ['H1', 'H2', 'H3', 'H4', 'P', 'SPAN', 'DIV', 'LI', 'UL', 'OL'].includes(clonedEl.tagName)) {
+                                        clonedEl.style.fontFamily = "'Noto Sans KR', 'Montserrat', sans-serif";
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    
+                            // 캔버스가 제대로 생성되었는지 확인
+                            if (!canvas || canvas.width === 0 || canvas.height === 0) {
+                                throw new Error('Canvas 생성 실패');
+                            }
+                            
+                            break; // 성공하면 루프 탈출
+                        } catch (error) {
+                            retryCount++;
+                            const errorMsg = error?.message || error?.toString() || '알 수 없는 오류';
+                            console.warn(`페이지 ${i + 1} 캡처 실패 (재시도 ${retryCount}/${maxRetries}):`, error);
+                            
+                            if (retryCount >= maxRetries) {
+                                throw new Error(`페이지 ${i + 1} 캡처 실패: ${errorMsg}`);
+                            }
+                            
+                            // 재시도 전 대기
+                            await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+                        }
+                    }
+                    
+                    // ============================================================
+                    // 2단계: Canvas를 이미지 데이터로 변환 (JPEG 형식)
+                    // ============================================================
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95); // JPEG 품질 95%
+                    
+                    // 이미지 데이터 검증
+                    if (!imgData || imgData === 'data:,') {
+                        throw new Error(`페이지 ${i + 1}의 이미지 데이터 생성 실패`);
+                    }
+                    
+                    // ============================================================
+                    // 3단계: PDF에 페이지 추가 및 이미지 삽입
+                    // ============================================================
+                    if (i > 0) doc.addPage(); // 첫 페이지가 아니면 새 페이지 추가
+                    doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight); // 이미지를 PDF 페이지에 삽입
+                    
+                    // ============================================================
+                    // 워터마크 추가 (includeWatermark가 true일 때만)
+                    // ============================================================
+                    if (includeWatermark) {
+                        const watermarkText = "KPLAN GROUP The K Real Estate Agency"; // 영문 권장
+                        
+                        // 1. 폰트 설정 (개수가 많아지므로 크기를 20으로 살짝 줄임)
+                        doc.setFontSize(16); 
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(220, 220, 220); // 연한 회색
+
+                        // 2. 투명도 적용 (0.15 = 15% 불투명도)
+                        try {
+                            if (window.jspdf && window.jspdf.GState) {
+                                doc.setGState(new window.jspdf.GState({ opacity: 0.03 }));
+                            }
+                        } catch (e) {}
+                        
+                        // 3. 간격 설정 (숫자가 작을수록 더 촘촘해집니다)
+                        const stepX = 40;  // 가로 간격 (기존 120 -> 60)
+                        const stepY = 30;  // 세로 간격 (기존 100 -> 50)
+                        const angle = 45;
+
+                        // 4. 반복 출력
+                        for (let x = -100; x < pdfWidth + 100; x += stepX) {
+                            for (let y = -100; y < pdfHeight + 100; y += stepY) {
+                                // 지그재그 배치
+                                const offsetX = (Math.floor(y / stepY) % 2) * (stepX / 2);
+                                
+                                doc.text(watermarkText, x + offsetX, y, {
+                                    angle: angle,
+                                    align: 'center',
+                                    renderingMode: 'fill'
+                                });
+                            }
+                        }
+
+                        // 5. 투명도 초기화
+                        try {
+                            if (window.jspdf && window.jspdf.GState) {
+                                doc.setGState(new window.jspdf.GState({ opacity: 1.0 }));
+                            }
+                        } catch (e) {}
+                    }
+                    
+                    // ============================================================
+                    // 4단계: 메인 페이지를 제외한 모든 페이지에 하단 텍스트 추가
+                    // ============================================================
+                    if (i > 0) {
+                        doc.setFontSize(8);
+                        doc.setTextColor(100, 116, 139); // slate-500 색상
+                        doc.setFont("helvetica", "normal");
+                        const copyrightText = REPORT_CONFIG.settings.copyright || 'COPYRIGHT © 2025 KOREA FACTORY. ALL RIGHTS RESERVED.';
+                        
+                        // 카피라이트 가운데 정렬
+                        doc.text(copyrightText, pdfWidth / 2, pdfHeight - 5, { align: 'center' });
+                        
+                        // 페이지 수는 오른쪽에 유지
+                        doc.text(`Page ${i + 1} / ${slides.length}`, pdfWidth - 20, pdfHeight - 5);
+                    }
+                    
+                    // 캡처용 복제본 제거 (다음 페이지 처리 전에 확실히 정리)
+                    captureContainer.removeChild(clone);
+                    
+                    // 메모리 정리를 위한 짧은 대기 (특히 마지막 페이지 전)
+                    if (i < slides.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                }
+                document.body.removeChild(captureContainer);
+                
+                // 파일명 설정 (타이틀 기반, 워터마크 여부에 따라)
+                const baseTitle = REPORT_CONFIG.settings.pageTitle || 'Consulting_Report';
+                // 파일명에 사용할 수 없는 문자 제거
+                const sanitizedTitle = baseTitle.replace(/[<>:"/\\|?*]/g, '').trim();
+                const fileName = includeWatermark ? `${sanitizedTitle} (워터마크).pdf` : `${sanitizedTitle}.pdf`;
+                doc.save(fileName);
+            } catch (e) { 
+                console.error('PDF Error:', e);
+                const errorMsg = e?.message || e?.toString() || '알 수 없는 오류';
+                alert('PDF Error: ' + errorMsg); 
+            } 
+            finally { 
+                loading.style.display = 'none'; 
+            }
+        }
+    </script>
+</body>
+</html>
