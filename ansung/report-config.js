@@ -7,7 +7,7 @@
 
 const REPORT_CONFIG = {
     settings: {
-        password: "1234", // 필요시 변경하세요
+        password: "1218", // 필요시 변경하세요
         naverMapId: "", // 네이버 지도 API Client ID가 있다면 입력 (없으면 이미지로 대체됨)
         pageTitle: "안성 가유 일반산업단지 입지 및 투자 타당성 분석",
         copyright: "COPYRIGHT © 2025 K-TECHNO VALLEY. ALL RIGHTS RESERVED.",
@@ -153,4 +153,5 @@ const REPORT_CONFIG = {
         }
     ]
 };
+
 
