@@ -58,8 +58,8 @@
             <div class="desktop-header grid grid-cols-12 gap-4 p-4 bg-slate-900/80 text-slate-400 text-sm font-bold border-b border-slate-700">
                 <div class="col-span-2 text-center">작성일자</div>
                 <div class="col-span-2 text-center">담당법인</div>
-                <div class="col-span-6 pl-4">보고서명</div>
-                <div class="col-span-2 text-center">바로가기</div>
+                <div class="col-span-4 pl-4">보고서명</div>
+                <div class="col-span-2 text-center text-yellow-500">비밀번호</div> <div class="col-span-2 text-center">바로가기</div>
             </div>
 
             <div id="projectList" class="divide-y divide-slate-700/50">
@@ -74,58 +74,58 @@
 
     <script>
         // ==================================================================
-        // 🛠️ [관리자 영역] 여기에 데이터를 추가하면 자동으로 줄이 생깁니다.
+        // 🛠️ [관리자 영역] pw 항목이 추가되었습니다.
         // ==================================================================
         const projects = [
             {
                 date: "2025-12-14",
                 corp: "한국팩토리",
-                title: "안성 가유 일반산업단지 보고서",
-                link: "ansung/index.html", // 연결할 파일 경로
-                status: "작업중" // 버튼에 표시될 텍스트
+                title: "안성가유일반산업단지",
+                pw: "1218",  // 👈 여기에 해당 보고서 비밀번호 입력
+                link: "ansung/index.html",
+                status: "작업중"
             },
-            // 👇 새로운 보고서가 생기면 아래 양식을 복사해서 내용을 바꿔주세요
+            // 👇 복사해서 사용할 양식
             {
                 date: "2026-12-14", 
                 corp: "더케이부동산중개법인", 
-                title: "화성시 귀래리 공장매매", 
+                title: "화성시 귀래리 공장 매매", 
+                pw: "1218", // 👈 비밀번호
                 link: "hwaseong01/hwaseong.html", 
-                status: "예정" 
+                status: "작업중" 
             },
         ];
 
-        // 🔑 비밀번호 설정
+        // 🔑 이 페이지 접속용 비밀번호
         const PASSWORD = "0401";
 
 
         // ==================================================================
-        // 🚀 시스템 로직 (수정할 필요 없음)
+        // 🚀 시스템 로직
         // ==================================================================
         
-        // 1. 초기화 및 렌더링
         function init() {
             renderProjects();
             document.getElementById('passwordInput').focus();
         }
 
-        // 2. 게시판 그리기 (PC/모바일 자동 대응)
         function renderProjects() {
             const listContainer = document.getElementById('projectList');
             const countDisplay = document.getElementById('projectCount');
-            
-            // 프로젝트 개수 업데이트
             countDisplay.innerText = projects.length;
 
             let html = '';
             projects.forEach(item => {
-                // 모바일/PC 반응형 HTML 생성
                 html += `
                 <div class="group hover:bg-slate-700/30 transition-colors duration-200">
                     <div class="hidden md:grid grid-cols-12 gap-4 p-4 items-center">
                         <div class="col-span-2 text-center text-slate-400 font-mono text-sm bg-slate-800/50 py-1 rounded mx-2">${item.date}</div>
                         <div class="col-span-2 text-center text-blue-400 font-bold text-sm">${item.corp}</div>
-                        <div class="col-span-6 text-white font-bold text-lg pl-4 truncate cursor-pointer group-hover:text-blue-300" onclick="window.location.href='${item.link}'">
+                        <div class="col-span-4 text-white font-bold text-lg pl-4 truncate cursor-pointer group-hover:text-blue-300" onclick="window.location.href='${item.link}'">
                             ${item.title}
+                        </div>
+                        <div class="col-span-2 text-center">
+                             <span class="text-yellow-500 font-mono font-bold bg-slate-900/60 px-3 py-1 rounded select-all cursor-text hover:bg-slate-900 transition-colors">${item.pw}</span>
                         </div>
                         <div class="col-span-2 text-center">
                             <a href="${item.link}" class="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded transition-all shadow hover:shadow-lg hover:shadow-blue-500/20">
@@ -142,6 +142,12 @@
                         <div class="text-white font-bold text-lg leading-tight" onclick="window.location.href='${item.link}'">
                             ${item.title}
                         </div>
+                        
+                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded border border-slate-700/50">
+                            <span class="text-slate-500 text-xs">접속 비밀번호</span>
+                            <span class="text-yellow-500 font-mono font-bold select-all">${item.pw}</span>
+                        </div>
+
                         <a href="${item.link}" class="mt-2 w-full text-center bg-slate-700 hover:bg-blue-600 text-slate-200 hover:text-white py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2">
                             <span>보고서 확인하기</span>
                             <span>&rarr;</span>
@@ -153,7 +159,6 @@
             listContainer.innerHTML = html;
         }
 
-        // 3. 비밀번호 체크
         function checkPassword() {
             const input = document.getElementById('passwordInput');
             const layer = document.getElementById('loginLayer');
@@ -183,7 +188,6 @@
             }
         }
 
-        // 실행
         window.onload = init;
     </script>
 </body>
